@@ -1,0 +1,6 @@
+Sitegeist.SlopMachine:Mixin.MCPExposed:
+  abstract: true
+  options:
+    mcp:
+      name: 'Abstract MCP-exposed node type'
+      description: 'A type of node to be read and written by MCP clients'
