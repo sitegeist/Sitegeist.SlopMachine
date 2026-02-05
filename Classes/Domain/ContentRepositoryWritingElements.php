@@ -13,7 +13,7 @@ use Neos\Flow\Security\Context;
 use Neos\Neos\Domain\Service\ContentContextFactory;
 
 #[Flow\Scope('singleton')]
-class ContentRepositoryWritingTool
+class ContentRepositoryWritingElements
 {
     public function __construct(
         protected ContentContextFactory $contentContextFactory,
@@ -30,9 +30,9 @@ class ContentRepositoryWritingTool
     #[McpTool(name: 'CreateNodeAggregateWithNode')]
     public function createNode(
         string $nodeTypeName,
-        $originDimensionSpacePoint,
+        \stdClass $originDimensionSpacePoint,
         string $parentNodeAggregateId,
-        $initialPropertyValues,
+        \stdClass $initialPropertyValues,
         ?string $succeedingSiblingNodeAggregateId = null,
         ?string $nodeName = null,
     ): void {
@@ -59,7 +59,6 @@ class ContentRepositoryWritingTool
                 ]);
 
                 $parentNode = $contentContext->getNodeByIdentifier($parentNodeAggregateId);
-                \file_put_contents(FLOW_PATH_ROOT . '/wat.txt', get_debug_type($parentNode) . "\n", FILE_APPEND);
                 $createdNode = $parentNode->createNode(
                     $nodeName ?: NodePaths::generateRandomNodeName(),
                     $this->nodeTypeManager->getNodeType($nodeTypeName),

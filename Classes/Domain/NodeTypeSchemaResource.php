@@ -11,6 +11,8 @@ use Neos\ContentRepository\Domain\Service\NodeTypeManager;
 #[Flow\Scope('singleton')]
 class NodeTypeSchemaResource
 {
+    public const URI = 'nodetypes://schema';
+
     public function __construct(
         protected NodeTypeManager $nodeTypeManager,
     ) {
@@ -19,7 +21,11 @@ class NodeTypeSchemaResource
     /**
      * @return array<string,mixed>
      */
-    #[McpResource(uri: 'nodetypes://schema', name: 'nodetype-schema')]
+    #[McpResource(
+        uri: self::URI,
+        name: 'nodetype-schema',
+        description: 'A list of available node types that can be handled by MCP clients',
+    )]
     public function get(): array
     {
         $schema = [];
@@ -37,13 +43,14 @@ class NodeTypeSchemaResource
                         ARRAY_FILTER_USE_KEY,
                     ),
                 ),
+                'constraints' => $nodeType->getConfiguration('constraints'),
             ];
         }
 
         return [
-            'uri' => 'nodetypes://schema',
-            'name' => 'Node type schema',
-            'description' => 'A list of available node types that can be handled by MCP clients',
+            'uri' => self::URI,
+            'name' => 'Node Type Schema',
+            'description' => 'The list of available node types. The properties field defines all properties that can be set on a node of that type. The constraints field defines structural restrictions the node type imposes, e.g. what type children of a node of this type must be of.',
             'mimeType' => 'application/json',
             'text' => \json_encode($schema),
         ];
