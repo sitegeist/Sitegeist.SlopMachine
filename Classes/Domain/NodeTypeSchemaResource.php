@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Sitegeist\SlopMachine\Domain;
 
+use Neos\ContentRepository\Domain\Model\NodeType;
 use Neos\Flow\Annotations as Flow;
 use Mcp\Capability\Attribute\McpResource;
 use Neos\ContentRepository\Domain\Service\NodeTypeManager;
@@ -45,6 +46,7 @@ class NodeTypeSchemaResource
                         ARRAY_FILTER_USE_KEY,
                     ),
                 ),
+                'supertypes' => array_values(array_unique($this->resolveSuperTypeNames($nodeType))),
                 'constraints' => $nodeType->getConfiguration('constraints'),
             ];
         }
@@ -56,5 +58,19 @@ class NodeTypeSchemaResource
             'mimeType' => 'application/json',
             'text' => \json_encode($schema),
         ];
+    }
+
+    /**
+     * @return array<string>
+     */
+    private function resolveSuperTypeNames(NodeType $nodeType): array
+    {
+        $superTypeNames = [];
+        foreach ($nodeType->getDeclaredSuperTypes() as $superType) {
+            $superTypeNames[] = $superType->getName();
+            $superTypeNames = array_merge($superTypeNames, $this->resolveSuperTypeNames($superType));
+        }
+
+        return $superTypeNames;
     }
 }
