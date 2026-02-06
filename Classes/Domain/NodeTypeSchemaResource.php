@@ -36,6 +36,8 @@ class NodeTypeSchemaResource
                 'properties' => array_map(
                     fn (array $propertyConfiguration): array => [
                         'type' => $propertyConfiguration['type'] ?? 'string',
+                        /** @todo handle i18n */
+                        'label' => $propertyConfiguration['ui']['label'] ?? '',
                     ],
                     array_filter(
                         $nodeType->getProperties(),
