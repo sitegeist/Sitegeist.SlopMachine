@@ -27,15 +27,20 @@ class ContentRepositoryWritingElements
      * @param \stdClass<string,string> $originDimensionSpacePoint
      * @param \stdClass<string,mixed> $initialPropertyValues
      */
-    #[McpTool(name: 'CreateNodeAggregateWithNode')]
-    public function createNode(
+    #[McpTool(
+        name: 'CreateNodeAggregateWithNode',
+        description: 'Create a new node with the given parameters. Node names are strictly optional and should not be used for regular editorial nodes. The succeedingSiblingNodeAggregateId is optional, only use it if a position relative to the siblings is explicitly requested.'
+    )]
+    public function createNodeAggregateWithNode(
         string $nodeTypeName,
-        \stdClass $originDimensionSpacePoint,
+        $originDimensionSpacePoint,
         string $parentNodeAggregateId,
-        \stdClass $initialPropertyValues,
+        $initialPropertyValues,
         ?string $succeedingSiblingNodeAggregateId = null,
         ?string $nodeName = null,
     ): void {
+        $originDimensionSpacePoint = \json_decode(json_encode($originDimensionSpacePoint), true);
+        $initialPropertyValues = \json_decode(json_encode($initialPropertyValues), true);
         $this->securityContext->withoutAuthorizationChecks(
             function() use(
                 $nodeTypeName,
@@ -45,8 +50,6 @@ class ContentRepositoryWritingElements
                 $succeedingSiblingNodeAggregateId,
                 $nodeName,
             ) {
-                $originDimensionSpacePoint = (array)$originDimensionSpacePoint;
-                $initialPropertyValues = (array)$initialPropertyValues;
                 $dimensions = [];
                 foreach ($originDimensionSpacePoint as $dimensionName => $dimensionValue) {
                     $dimensions[$dimensionName] = $this->contentDimensionPresetSource->getAllPresets()[$dimensionName]['presets'][$dimensionValue]['values'];
@@ -68,6 +71,46 @@ class ContentRepositoryWritingElements
                 }
                 if ($succeedingSibling = $succeedingSiblingNodeAggregateId ? $contentContext->getNodeByIdentifier($succeedingSiblingNodeAggregateId) : null) {
                     $createdNode->moveBefore($succeedingSibling);
+                }
+            }
+        );
+    }
+
+    /**
+     * @param \stdClass<string,string> $originDimensionSpacePoint
+     * @param \stdClass<string,mixed> $propertyValues
+     */
+    #[McpTool(
+        name: 'SetNodeProperties',
+        description: 'Sets properties on an existing node.'
+    )]
+    public function setNodeProperties(
+        string $nodeAggregateId,
+        $originDimensionSpacePoint,
+        $propertyValues,
+    ): void {
+        $originDimensionSpacePoint = \json_decode(json_encode($originDimensionSpacePoint), true);
+        $propertyValues = \json_decode(json_encode($propertyValues), true);
+        $this->securityContext->withoutAuthorizationChecks(
+            function() use(
+                $nodeAggregateId,
+                $originDimensionSpacePoint,
+                $propertyValues,
+            ) {
+                $dimensions = [];
+                foreach ($originDimensionSpacePoint as $dimensionName => $dimensionValue) {
+                    $dimensions[$dimensionName] = $this->contentDimensionPresetSource->getAllPresets()[$dimensionName]['presets'][$dimensionValue]['values'];
+                }
+                $contentContext = $this->contentContextFactory->create([
+                    'workspaceName' => 'user-admin',
+                    'dimensions' => $dimensions,
+                    'targetDimensions' => $originDimensionSpacePoint,
+                    'invisibleContentShown' => true,
+                ]);
+
+                $node = $contentContext->getNodeByIdentifier($nodeAggregateId);
+                foreach ($propertyValues as $propertyName => $propertyValue) {
+                    $node->setProperty($propertyName, $propertyValue);
                 }
             }
         );
