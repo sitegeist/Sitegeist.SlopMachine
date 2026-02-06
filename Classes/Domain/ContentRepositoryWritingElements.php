@@ -9,6 +9,7 @@ use Neos\ContentRepository\Domain\Service\ContentDimensionPresetSourceInterface;
 use Neos\ContentRepository\Domain\Service\NodeTypeManager;
 use Neos\ContentRepository\Domain\Utility\NodePaths;
 use Neos\Flow\Annotations as Flow;
+use Neos\Flow\Property\PropertyMapper;
 use Neos\Flow\Security\Context;
 use Neos\Neos\Domain\Service\ContentContextFactory;
 
@@ -20,6 +21,7 @@ class ContentRepositoryWritingElements
         protected ContentDimensionPresetSourceInterface $contentDimensionPresetSource,
         protected NodeTypeManager $nodeTypeManager,
         protected Context $securityContext,
+        protected PropertyMapper $propertyMapper,
     ) {
     }
 
@@ -67,6 +69,11 @@ class ContentRepositoryWritingElements
                     $this->nodeTypeManager->getNodeType($nodeTypeName),
                 );
                 foreach ($initialPropertyValues as $propertyName => $propertyValue) {
+                    $nodeType = $this->nodeTypeManager->getNodeType($nodeTypeName);
+                    $expectedType = $nodeType->getPropertyType($propertyName);
+                    if (class_exists($expectedType) && !$propertyValue instanceof $expectedType) {
+                        $propertyValue = $this->propertyMapper->convert($propertyValue, $expectedType);
+                    }
                     $createdNode->setProperty($propertyName, $propertyValue);
                 }
                 if ($succeedingSibling = $succeedingSiblingNodeAggregateId ? $contentContext->getNodeByIdentifier($succeedingSiblingNodeAggregateId) : null) {
@@ -110,6 +117,11 @@ class ContentRepositoryWritingElements
 
                 $node = $contentContext->getNodeByIdentifier($nodeAggregateId);
                 foreach ($propertyValues as $propertyName => $propertyValue) {
+                    $nodeType = $node->getNodeType();
+                    $expectedType = $nodeType->getPropertyType($propertyName);
+                    if (class_exists($expectedType) && !$propertyValue instanceof $expectedType) {
+                        $propertyValue = $this->propertyMapper->convert($propertyValue, $expectedType);
+                    }
                     $node->setProperty($propertyName, $propertyValue);
                 }
             }
