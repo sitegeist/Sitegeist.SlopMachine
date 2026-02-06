@@ -44,7 +44,7 @@ class SitesResource
             ) {
                 $dimensionSpacePoint = \json_decode(\urldecode($dimensionSpacePoint), true, 512, JSON_THROW_ON_ERROR);
                 $dimensions = [];
-                foreach (['language' => 'en'] as $dimensionName => $dimensionValue) {
+                foreach ($dimensionSpacePoint as $dimensionName => $dimensionValue) {
                     $dimensions[$dimensionName] = $this->contentDimensionPresetSource->getAllPresets()[$dimensionName]['presets'][$dimensionValue]['values'];
                 }
                 $contentContext = $this->contentContextFactory->create([
