@@ -150,6 +150,7 @@ class ContentRepositoryReadingElements
     {
         return [
             'aggregateId' => $node->getIdentifier(),
+            'label' => $node->getLabel(),
             'properties' => array_filter(
                 iterator_to_array($node->getProperties()),
                 fn (string $propertyName) => !$limitToPropertyNames || in_array(
