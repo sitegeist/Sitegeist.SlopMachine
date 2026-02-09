@@ -48,13 +48,14 @@ class NodeTypeSchemaResource
                 ),
                 'supertypes' => array_values(array_unique($this->resolveSuperTypeNames($nodeType))),
                 'constraints' => $nodeType->getConfiguration('constraints'),
+                'tetheredChildren' => $nodeType->getConfiguration('childNodes'),
             ];
         }
 
         return [
             'uri' => self::URI,
             'name' => 'Node Type Schema',
-            'description' => 'The list of available node types. The properties field defines all properties that can be set on a node of that type. The constraints field defines structural restrictions the node type imposes, e.g. what type children of a node of this type must be of.',
+            'description' => 'The list of available node types. The properties field defines all properties that can be set on a node of that type. The constraints field defines structural restrictions the node type imposes, e.g. what type children of a node of this type must be of. The tetheredChildren field defines which child nodes are automatically created under a new node of this type.',
             'mimeType' => 'application/json',
             'text' => \json_encode($schema),
         ];
