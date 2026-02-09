@@ -28,10 +28,11 @@ class ContentRepositoryWritingElements
     /**
      * @param \stdClass<string,string> $originDimensionSpacePoint
      * @param \stdClass<string,mixed> $initialPropertyValues
+     * @return array<string,mixed>
      */
     #[McpTool(
         name: 'CreateNodeAggregateWithNode',
-        description: 'Create a new node with the given parameters. Node names are strictly optional and should not be used for regular editorial nodes. The succeedingSiblingNodeAggregateId is optional, only use it if a position relative to the siblings is explicitly requested.'
+        description: 'Create a new node with the given parameters. Node names are strictly optional and should not be used for regular editorial nodes. The succeedingSiblingNodeAggregateId is optional, only use it if a position relative to the siblings is explicitly requested. Remember that tethered children don\'t need to be created explicitly as they are created automatically created together with their parent. Returns the nodeAggregateId of the created node as well as the nodeAggregateIds of the tethered descendants that were created as well.'
     )]
     public function createNodeAggregateWithNode(
         string $nodeTypeName,
@@ -40,9 +41,10 @@ class ContentRepositoryWritingElements
         $initialPropertyValues,
         ?string $succeedingSiblingNodeAggregateId = null,
         ?string $nodeName = null,
-    ): void {
+    ): array {
         $originDimensionSpacePoint = \json_decode(json_encode($originDimensionSpacePoint), true);
         $initialPropertyValues = \json_decode(json_encode($initialPropertyValues), true);
+        $result = [];
         $this->securityContext->withoutAuthorizationChecks(
             function() use(
                 $nodeTypeName,
@@ -51,6 +53,7 @@ class ContentRepositoryWritingElements
                 $initialPropertyValues,
                 $succeedingSiblingNodeAggregateId,
                 $nodeName,
+                &$result,
             ) {
                 $dimensions = [];
                 foreach ($originDimensionSpacePoint as $dimensionName => $dimensionValue) {
@@ -68,8 +71,8 @@ class ContentRepositoryWritingElements
                     $nodeName ?: NodePaths::generateRandomNodeName(),
                     $this->nodeTypeManager->getNodeType($nodeTypeName),
                 );
+                $nodeType = $this->nodeTypeManager->getNodeType($nodeTypeName);
                 foreach ($initialPropertyValues as $propertyName => $propertyValue) {
-                    $nodeType = $this->nodeTypeManager->getNodeType($nodeTypeName);
                     $expectedType = $nodeType->getPropertyType($propertyName);
                     if (class_exists($expectedType) && !$propertyValue instanceof $expectedType) {
                         $propertyValue = $this->propertyMapper->convert($propertyValue, $expectedType);
@@ -79,8 +82,27 @@ class ContentRepositoryWritingElements
                 if ($succeedingSibling = $succeedingSiblingNodeAggregateId ? $contentContext->getNodeByIdentifier($succeedingSiblingNodeAggregateId) : null) {
                     $createdNode->moveBefore($succeedingSibling);
                 }
+                $tetheredDescendantIds = [];
+                foreach ($nodeType->getAutoCreatedChildNodes() as $nodeName => $tetheredNodeType) {
+                    $tetheredDescendantIds[$nodeName] = $createdNode->getNode($nodeName)->getIdentifier();
+                }
+
+                $nodeRecord = [
+                    'nodeAggregateId' => $createdNode->getIdentifier(),
+                    'tetheredDescendantAggregateIds' => $tetheredDescendantIds,
+                ];
+
+                $result = [
+                    'content' => [
+                        'type' => 'text',
+                        'text' => \json_encode($nodeRecord),
+                    ],
+                    'structuredContent' => $nodeRecord,
+                ];
             }
         );
+
+        return $result;
     }
 
     /**
