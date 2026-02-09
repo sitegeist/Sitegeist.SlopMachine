@@ -11,6 +11,7 @@ use Neos\Eel\FlowQuery\FlowQuery;
 use Neos\Flow\Annotations as Flow;
 use Neos\Flow\Security\Context;
 use Neos\Neos\Domain\Service\ContentContextFactory;
+use Neos\Utility\Arrays;
 
 #[Flow\Scope('singleton')]
 class ContentRepositoryReadingElements
@@ -51,9 +52,7 @@ class ContentRepositoryReadingElements
             ) {
                 $dimensionSpacePoint = \json_decode(\urldecode($dimensionSpacePoint), true, 512, JSON_THROW_ON_ERROR);
                 $nodeTypeName = \urldecode($nodeTypeName);
-                $limitToPropertyNames = $limitToPropertyNames === '*'
-                    ? null
-                    : \json_decode(\urldecode($limitToPropertyNames), true, 512, JSON_THROW_ON_ERROR);
+                $limitToPropertyNames = $this->resolveListValue($limitToPropertyNames);
                 $dimensions = [];
                 foreach ($dimensionSpacePoint as $dimensionName => $dimensionValue) {
                     $dimensions[$dimensionName] = $this->contentDimensionPresetSource->getAllPresets()[$dimensionName]['presets'][$dimensionValue]['values'];
@@ -111,9 +110,7 @@ class ContentRepositoryReadingElements
             ) {
                 $dimensionSpacePoint = \json_decode(\urldecode($dimensionSpacePoint), true, 512, JSON_THROW_ON_ERROR);
                 $nodeTypeName = \urldecode($nodeTypeName);
-                $limitToPropertyNames = $limitToPropertyNames === '*'
-                    ? null
-                    : \json_decode(\urldecode($limitToPropertyNames), true, 512, JSON_THROW_ON_ERROR);
+                $limitToPropertyNames = $this->resolveListValue($limitToPropertyNames);
                 $dimensions = [];
                 foreach ($dimensionSpacePoint as $dimensionName => $dimensionValue) {
                     $dimensions[$dimensionName] = $this->contentDimensionPresetSource->getAllPresets()[$dimensionName]['presets'][$dimensionValue]['values'];
@@ -161,5 +158,20 @@ class ContentRepositoryReadingElements
             ),
             'nodeTypeName' => $node->getNodeTypeName(),
         ];
+    }
+
+    private function resolveListValue(string $limitToPropertyNames): ?array
+    {
+        $limitToPropertyNames = \urldecode($limitToPropertyNames);
+        if ($limitToPropertyNames === '*') {
+            return null;
+        }
+
+        $jsonDecodedValue = \json_decode($limitToPropertyNames, true);
+        if ($jsonDecodedValue !== null) {
+            return $jsonDecodedValue;
+        }
+
+        return Arrays::trimExplode(',', $limitToPropertyNames);
     }
 }
