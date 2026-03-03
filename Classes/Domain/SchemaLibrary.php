@@ -14,8 +14,11 @@ final class SchemaLibrary
             The succeedingSiblingNodeAggregateId is optional, only use it if a position relative to the siblings is explicitly requested.
             The optional references property accepts a single or an array of nodeAggregateIds per reference name.
             References must be set via the references property, as a single node aggregate id or a list of them per reference name.
+            If the references property is set, it must not be empty. If no references are to be set, omit the property completely.
             Remember that tethered children don\'t need to be created explicitly as they are created automatically created together with their parent.
-            Returns the nodeAggregateId and nodeName of the created node as well as the nodeAggregateIds of the tethered descendants that were created additionally.',
+            Returns the nodeAggregateId and nodeName of the created node as well as the nodeAggregateIds of the tethered descendants that were created additionally.
+            Example:
+                {"commands":[{"type":"CreateNodeAggregateWithNode","nodeTypeName":"Acme.Site:Document.WebPage","parentNodeAggregateId":"27ad5d9d-e8e9-4e91-aa16-e1e8719e2f37","originDimensionSpacePoint":{"language":"de"},"initialPropertyValues":{"title":"My title","uriPathSegment":"my-title"}}]}',
         'properties' => [
             'type' => [
                 'type' => 'string',
@@ -52,7 +55,6 @@ final class SchemaLibrary
             'nodeTypeName',
             'originDimensionSpacePoint',
             'parentNodeAggregateId',
-            'initialPropertyValues',
         ],
         'additionalProperties' => false,
     ];

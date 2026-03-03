@@ -50,7 +50,7 @@ class ContentRepositoryWritingElements
             nodeTypeName: $command['nodeTypeName'],
             originDimensionSpacePoint: $command['originDimensionSpacePoint'],
             parentNodeAggregateId: $command['parentNodeAggregateId'],
-            initialPropertyValues: $command['initialPropertyValues'],
+            initialPropertyValues: $command['initialPropertyValues'] ?? [],
             nodeAggregateId: $command['nodeAggregateId'] ?? null,
             succeedingSiblingNodeAggregateId: $command['succeedingSiblingNodeAggregateId'] ?? null,
             nodeName: $command['nodeName'] ?? null,
@@ -154,7 +154,7 @@ class ContentRepositoryWritingElements
     public function bulkWriting(
         #[Schema(
             type: 'array',
-            description: 'List of write commands. Each item must be one valid command object.',
+            description: 'List of write commands. Each item must be one valid command object, not a JSON string.',
             items: SchemaLibrary::COMMANDS_SCHEMA,
             minItems: 1,
         )]
@@ -167,7 +167,7 @@ class ContentRepositoryWritingElements
                     nodeTypeName: $command['nodeTypeName'],
                     originDimensionSpacePoint: $command['originDimensionSpacePoint'],
                     parentNodeAggregateId: $command['parentNodeAggregateId'],
-                    initialPropertyValues: $command['initialPropertyValues'],
+                    initialPropertyValues: $command['initialPropertyValues'] ?? [],
                     nodeAggregateId: $command['nodeAggregateId'] ?? null,
                     succeedingSiblingNodeAggregateId: $command['succeedingSiblingNodeAggregateId'] ?? null,
                     nodeName: $command['nodeName'] ?? null,
@@ -236,7 +236,9 @@ class ContentRepositoryWritingElements
                         $nodeAggregateId,
                     );
                     $nodeType = $this->nodeTypeManager->getNodeType($nodeTypeName);
-                    $this->setProperties($createdNode, $initialPropertyValues);
+                    if ($initialPropertyValues !== []) {
+                        $this->setProperties($createdNode, $initialPropertyValues);
+                    }
                     if ($references !== []) {
                         $this->setReferences($createdNode, $references);
                     }

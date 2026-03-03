@@ -59,6 +59,16 @@ class QueryPatternsResource
                     'requirement' => 'always',
                     'message' => 'BulkWriting commands must be objects, not JSON-encoded strings.',
                 ],
+                [
+                    'id' => 'schema-usage',
+                    'requirement' => 'always',
+                    'message' => 'All MCP resources and tools provide a strict schema that is both enforced and completely declared. Always use these schemas when calling the MCP API, never use trial and error.',
+                ],
+                [
+                    'id' => 'linking',
+                    'requirement' => 'always',
+                    'message' => 'Always set link properties to node://<aggregateId>. Never use path URLs. This also includes handling of inline links (e.g. <a href="node://4fe8f2f2-8a3d-4062-8b46-aaf22f25d832">Some link text</a>)',
+                ],
             ],
             'parameterFormats' => [
                 [
@@ -82,8 +92,8 @@ class QueryPatternsResource
                 [
                     'parameter' => 'searchTerm',
                     'format' => 'single-value-or-asterisk',
-                    'exampleRaw' => 'Ostern',
-                    'exampleEncoded' => 'Ostern',
+                    'exampleRaw' => 'Easter',
+                    'exampleEncoded' => 'Easter',
                 ],
             ],
             'fallbackSequenceOnReadError' => [

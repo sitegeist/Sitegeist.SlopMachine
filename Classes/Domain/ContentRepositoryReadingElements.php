@@ -294,7 +294,7 @@ class ContentRepositoryReadingElements
     private function collectMatchingSubtrees(
         Node $currentNode,
         string $nodeTypeNames,
-        array $limitToPropertyNames,
+        ?array $limitToPropertyNames,
         int $level,
         int $maximumLevels,
     ): array {
