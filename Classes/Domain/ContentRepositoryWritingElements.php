@@ -6,6 +6,7 @@ namespace Sitegeist\SlopMachine\Domain;
 
 use Mcp\Capability\Attribute\McpTool;
 use Mcp\Capability\Attribute\Schema;
+use Neos\ContentRepository\Domain\Model\Node;
 use Neos\ContentRepository\Domain\Service\ContentDimensionPresetSourceInterface;
 use Neos\ContentRepository\Domain\Service\NodeTypeManager;
 use Neos\ContentRepository\Domain\Utility\NodePaths;
@@ -33,13 +34,7 @@ class ContentRepositoryWritingElements
      */
     #[McpTool(
         name: 'CreateNodeAggregateWithNode',
-        description: 'Create a new node with the given parameters.
-            If you want to perform subsequent actions using the created node, you can provide its nodeAggregateId with the optional nodeAggregateId parameter.
-            By default, UUIDs are to be used.
-            Node names are strictly optional and should not be used for regular editorial nodes.
-            The succeedingSiblingNodeAggregateId is optional, only use it if a position relative to the siblings is explicitly requested.
-            Remember that tethered children don\'t need to be created explicitly as they are created automatically created together with their parent.
-            Returns the nodeAggregateId and nodeName of the created node as well as the nodeAggregateIds of the tethered descendants that were created additionally.'
+        description: SchemaLibrary::CREATE_NODEAGGREGATE_WITH_NODE_SCHEMA['description'],
     )]
     public function createNodeAggregateWithNode(
         #[Schema(
@@ -56,9 +51,10 @@ class ContentRepositoryWritingElements
             originDimensionSpacePoint: $command['originDimensionSpacePoint'],
             parentNodeAggregateId: $command['parentNodeAggregateId'],
             initialPropertyValues: $command['initialPropertyValues'],
-            nodeAggregateId: $command['$nodeAggregateId'],
-            succeedingSiblingNodeAggregateId: $command['succeedingSiblingNodeAggregateId'],
-            nodeName: $command['nodeName'],
+            nodeAggregateId: $command['nodeAggregateId'] ?? null,
+            succeedingSiblingNodeAggregateId: $command['succeedingSiblingNodeAggregateId'] ?? null,
+            nodeName: $command['nodeName'] ?? null,
+            references: $command['references'] ?? [],
         );
 
         return [
@@ -76,7 +72,7 @@ class ContentRepositoryWritingElements
      */
     #[McpTool(
         name: 'SetNodeProperties',
-        description: 'Sets properties on an existing node.'
+        description: SchemaLibrary::SET_NODE_PROPERTIES_SCHEMA['description'],
     )]
     public function setNodeProperties(
         #[Schema(
@@ -105,9 +101,7 @@ class ContentRepositoryWritingElements
      */
     #[McpTool(
         name: 'SetNodeReferences',
-        description: 'Sets references on an existing node to one or more other existing nodes.
-            Use this tool for setting properties of type reference or references.
-            The referencesToWrite parameter accepts a single or an array of nodeAggregateIds per reference name.'
+        description: SchemaLibrary::SET_NODE_REFERENCES_SCHEMA['description'],
     )]
     public function setNodeReferences(
         #[Schema(
@@ -119,7 +113,11 @@ class ContentRepositoryWritingElements
         )]
         array $command,
     ): array {
-        $payload = $this->handleSetNodeReferences($command['nodeAggregateId'], $command['originDimensionSpacePoint'], $command['referencesToWrite']);
+        $payload = $this->handleSetNodeReferences(
+            nodeAggregateId: $command['nodeAggregateId'],
+            originDimensionSpacePoint: $command['originDimensionSpacePoint'],
+            references: $command['references']
+        );
 
         return [
             'content' => [
@@ -137,6 +135,7 @@ class ContentRepositoryWritingElements
         name: 'BulkWriting',
         description: 'Allows for issuing multiple write commands at once.
             Use this if you want to e.g. create a completely new page and add its content in one batch.
+            Commands must be sent as objects, not as JSON strings.
             Each command must define its `type` (CreateNodeAggregateWithNode, SetNodeProperties, SetNodeReferences) and has the same properties as the corresponding tools.
             An example command would be {"type": "SetNodeProperties", "nodeAggregateId": "8a887309-5803-458d-b30a-40736f5a5d82", "originDimensionSpacePoint": {"language":"de"}, "propertyValues": {"title": "My Title"}}
             The commands are unserialized along with the `commands` parameter and must not be double encoded.
@@ -165,23 +164,24 @@ class ContentRepositoryWritingElements
         foreach ($commands as $command) {
             $result[] = match ($command['type'] ?? null) {
                 'CreateNodeAggregateWithNode' => $this->handleCreateNodeAggregateWithNode(
-                    $command['nodeTypeName'],
-                    $command['originDimensionSpacePoint'],
-                    $command['parentNodeAggregateId'],
-                    $command['initialPropertyValues'],
-                    $command['nodeAggregateId'] ?? null,
-                    $command['succeedingSiblingNodeAggregateId'] ?? null,
-                    $command['nodeName'] ?? null,
+                    nodeTypeName: $command['nodeTypeName'],
+                    originDimensionSpacePoint: $command['originDimensionSpacePoint'],
+                    parentNodeAggregateId: $command['parentNodeAggregateId'],
+                    initialPropertyValues: $command['initialPropertyValues'],
+                    nodeAggregateId: $command['nodeAggregateId'] ?? null,
+                    succeedingSiblingNodeAggregateId: $command['succeedingSiblingNodeAggregateId'] ?? null,
+                    nodeName: $command['nodeName'] ?? null,
+                    references: $command['references'] ?? [],
                 ),
                 'SetNodeProperties' => $this->handleSetNodeProperties(
-                    $command['nodeAggregateId'],
-                    $command['originDimensionSpacePoint'],
-                    $command['propertyValues'],
+                    nodeAggregateId: $command['nodeAggregateId'],
+                    originDimensionSpacePoint: $command['originDimensionSpacePoint'],
+                    propertyValues: $command['propertyValues'],
                 ),
                 'SetNodeReferences' => $this->handleSetNodeReferences(
-                    $command['nodeAggregateId'],
-                    $command['originDimensionSpacePoint'],
-                    $command['referencesToWrite'],
+                    nodeAggregateId: $command['nodeAggregateId'],
+                    originDimensionSpacePoint: $command['originDimensionSpacePoint'],
+                    references: $command['references'],
                 ),
                 null => [
                     'success' => false,
@@ -200,6 +200,7 @@ class ContentRepositoryWritingElements
     /**
      * @param array<string,string> $originDimensionSpacePoint
      * @param array<string,mixed> $initialPropertyValues
+     * @param array<string,mixed> $references
      * @return array<string,mixed>
      */
     private function handleCreateNodeAggregateWithNode(
@@ -210,6 +211,7 @@ class ContentRepositoryWritingElements
         ?string $nodeAggregateId = null,
         ?string $succeedingSiblingNodeAggregateId = null,
         ?string $nodeName = null,
+        array $references = [],
     ): array {
         $contentContext = $this->getContentContext($originDimensionSpacePoint);
         $result = [];
@@ -222,44 +224,50 @@ class ContentRepositoryWritingElements
                 $nodeAggregateId,
                 $succeedingSiblingNodeAggregateId,
                 $nodeName,
+                $references,
                 &$result,
             ) {
-                $parentNode = $contentContext->getNodeByIdentifier($parentNodeAggregateId);
-                $createdNode = $parentNode->createNode(
-                    $nodeName ?: NodePaths::generateRandomNodeName(),
-                    $this->nodeTypeManager->getNodeType($nodeTypeName),
-                    $nodeAggregateId,
-                );
-                $nodeType = $this->nodeTypeManager->getNodeType($nodeTypeName);
-                foreach ($initialPropertyValues as $propertyName => $propertyValue) {
-                    $expectedType = $nodeType->getPropertyType($propertyName);
-                    if (class_exists($expectedType) && !$propertyValue instanceof $expectedType) {
-                        $propertyValue = $this->propertyMapper->convert($propertyValue, $expectedType);
+                try {
+                    $parentNode = $contentContext->getNodeByIdentifier($parentNodeAggregateId);
+                    /** @var Node $createdNode */
+                    $createdNode = $parentNode->createNode(
+                        $nodeName ?: NodePaths::generateRandomNodeName(),
+                        $this->nodeTypeManager->getNodeType($nodeTypeName),
+                        $nodeAggregateId,
+                    );
+                    $nodeType = $this->nodeTypeManager->getNodeType($nodeTypeName);
+                    $this->setProperties($createdNode, $initialPropertyValues);
+                    if ($references !== []) {
+                        $this->setReferences($createdNode, $references);
                     }
-                    $createdNode->setProperty($propertyName, $propertyValue);
-                }
-                if ($succeedingSibling = $succeedingSiblingNodeAggregateId ? $contentContext->getNodeByIdentifier($succeedingSiblingNodeAggregateId) : null) {
-                    $createdNode->moveBefore($succeedingSibling);
-                }
-                $tetheredDescendantIds = [];
-                foreach ($nodeType->getAutoCreatedChildNodes() as $nodeName => $tetheredNodeType) {
-                    $tetheredDescendantIds[$nodeName] = $createdNode->getNode($nodeName)->getIdentifier();
-                }
+                    if ($succeedingSibling = $succeedingSiblingNodeAggregateId ? $contentContext->getNodeByIdentifier($succeedingSiblingNodeAggregateId) : null) {
+                        $createdNode->moveBefore($succeedingSibling);
+                    }
+                    $tetheredDescendantIds = [];
+                    foreach ($nodeType->getAutoCreatedChildNodes() as $nodeName => $tetheredNodeType) {
+                        $tetheredDescendantIds[$nodeName] = $createdNode->getNode($nodeName)->getIdentifier();
+                    }
 
-                $payload = [
-                    'success' => true,
-                    'nodeAggregateId' => $createdNode->getIdentifier(),
-                    'nodeName' => $createdNode->getName(),
-                    'tetheredDescendantAggregateIds' => $tetheredDescendantIds,
-                ];
+                    $payload = [
+                        'success' => true,
+                        'nodeAggregateId' => $createdNode->getIdentifier(),
+                        'nodeName' => $createdNode->getName(),
+                        'tetheredDescendantAggregateIds' => $tetheredDescendantIds,
+                    ];
 
-                $result = [
-                    'content' => [
-                        'type' => 'text',
-                        'text' => \json_encode($payload),
-                    ],
-                    'structuredContent' => $payload,
-                ];
+                    $result = [
+                        'content' => [
+                            'type' => 'text',
+                            'text' => \json_encode($payload),
+                        ],
+                        'structuredContent' => $payload,
+                    ];
+                } catch (\Throwable $exception) {
+                    $result = [
+                        'success' => false,
+                        'message' => $exception->getMessage(),
+                    ];
+                }
             }
         );
 
@@ -278,87 +286,108 @@ class ContentRepositoryWritingElements
     ): array {
         $contentContext = $this->getContentContext($originDimensionSpacePoint);
         $result = [];
-        try {
-            $this->securityContext->withoutAuthorizationChecks(
-                function() use(
-                    $nodeAggregateId,
-                    $contentContext,
-                    $propertyValues,
-                    &$result,
-                ) {
+        $this->securityContext->withoutAuthorizationChecks(
+            function() use(
+                $nodeAggregateId,
+                $contentContext,
+                $propertyValues,
+                &$result,
+            ) {
+                try {
+                    /** @var Node $node */
                     $node = $contentContext->getNodeByIdentifier($nodeAggregateId);
-                    foreach ($propertyValues as $propertyName => $propertyValue) {
-                        $nodeType = $node->getNodeType();
-                        $expectedType = $nodeType->getPropertyType($propertyName);
-                        if (class_exists($expectedType) && !$propertyValue instanceof $expectedType) {
-                            $propertyValue = $this->propertyMapper->convert($propertyValue, $expectedType);
-                        }
-                        $node->setProperty($propertyName, $propertyValue);
-                    }
+                    $this->setProperties($node, $propertyValues);
 
                     $result = [
                         'success' => true,
                         'message' => null,
                     ];
+                } catch (\Throwable $exception) {
+                    $result = [
+                        'success' => false,
+                        'message' => $exception->getMessage(),
+                    ];
                 }
-            );
-        } catch (\Throwable $exception) {
-            $result = [
-                'success' => false,
-                'message' => $exception->getMessage(),
-            ];
-        }
+            }
+        );
 
         return $result;
     }
 
     /**
      * @param array<string,string> $originDimensionSpacePoint
-     * @param array<string,mixed> $referencesToWrite
+     * @param array<string,mixed> $references
      * @return array<string,mixed>
      */
     private function handleSetNodeReferences(
         string $nodeAggregateId,
         array $originDimensionSpacePoint,
-        array $referencesToWrite,
+        array $references,
     ): array {
         $contentContext = $this->getContentContext($originDimensionSpacePoint);
         $result = [];
-        try {
-            $this->securityContext->withoutAuthorizationChecks(
-                function() use(
-                    $nodeAggregateId,
-                    $contentContext,
-                    $referencesToWrite,
-                    &$result,
-                ) {
+        $this->securityContext->withoutAuthorizationChecks(
+            function() use(
+                $nodeAggregateId,
+                $contentContext,
+                $references,
+                &$result,
+            ) {
+                try {
+                    /** @var Node $node */
                     $node = $contentContext->getNodeByIdentifier($nodeAggregateId);
-                    foreach ($referencesToWrite as $propertyName => $propertyValue) {
-                        $nodeType = $node->getNodeType();
-                        $expectedType = $nodeType->getPropertyType($propertyName);
-                        if ($expectedType === 'reference' && is_array($propertyValue)) {
-                            $propertyValue = reset($propertyValue);
-                        }
-                        if ($expectedType === 'references' && is_string($propertyValue)) {
-                            $propertyValue = [$propertyValue];
-                        }
-                        $node->setProperty($propertyName, $propertyValue);
-                    }
+                    $this->setReferences($node, $references);
 
                     $result = [
                         'success' => true,
                         'message' => null,
                     ];
+                } catch (\Throwable $exception) {
+                    $result = [
+                        'success' => false,
+                        'message' => $exception->getMessage(),
+                    ];
                 }
-            );
-        } catch (\Throwable $exception) {
-            $result = [
-                'success' => false,
-                'message' => $exception->getMessage(),
-            ];
-        }
+            }
+        );
 
         return $result;
+    }
+
+    /**
+     * @param array<string,mixed> $properties
+     */
+    private function setProperties(Node $node, array $properties): void
+    {
+        $nodeType = $node->getNodeType();
+        foreach ($properties as $propertyName => $propertyValue) {
+            $expectedType = $nodeType->getPropertyType($propertyName);
+            if ($expectedType === 'reference' || $expectedType === 'references') {
+                throw new \Exception('References must be set as references, not properties.');
+            }
+            if (class_exists($expectedType) && !$propertyValue instanceof $expectedType) {
+                $propertyValue = $this->propertyMapper->convert($propertyValue, $expectedType);
+            }
+            $node->setProperty($propertyName, $propertyValue);
+        }
+    }
+
+    /**
+     * @param array<string,mixed> $references
+     */
+    private function setReferences(Node $node, array $references): void
+    {
+        $nodeType = $node->getNodeType();
+        foreach ($references as $propertyName => $propertyValue) {
+            $expectedType = $nodeType->getPropertyType($propertyName);
+            if ($expectedType === 'reference' && is_array($propertyValue)) {
+                $propertyValue = reset($propertyValue);
+            }
+            if ($expectedType === 'references' && is_string($propertyValue)) {
+                $propertyValue = [$propertyValue];
+            }
+            $node->setProperty($propertyName, $propertyValue);
+        }
     }
 
     private function getContentContext(array $originDimensionSpacePoint): ContentContext
