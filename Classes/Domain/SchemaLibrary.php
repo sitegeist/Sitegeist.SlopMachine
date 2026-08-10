@@ -134,4 +134,82 @@ final class SchemaLibrary
             'propertyName' => 'type'
         ]
     ];
+
+    /**
+     * Only `success` is required: a failed command carries `message` and none of the fields that
+     * describe a created node, so anything beyond `success` has to stay optional.
+     */
+    public const CREATE_NODEAGGREGATE_WITH_NODE_RESULT_SCHEMA = [
+        'type' => 'object',
+        'description' => 'The result of a single CreateNodeAggregateWithNode command.',
+        'properties' => [
+            'type' => [
+                'type' => 'string',
+                'const' => 'CreateNodeAggregateWithNode',
+            ],
+            'success' => ['type' => 'boolean'],
+            'message' => ['type' => ['string', 'null']],
+            'nodeAggregateId' => ['type' => 'string'],
+            'nodeName' => ['type' => 'string'],
+            'tetheredDescendantAggregateIds' => [
+                'type' => 'object',
+                'additionalProperties' => ['type' => 'string'],
+            ],
+        ],
+        'required' => ['success'],
+    ];
+
+    public const SET_NODE_PROPERTIES_RESULT_SCHEMA = [
+        'type' => 'object',
+        'description' => 'The result of a single SetNodeProperties command.',
+        'properties' => [
+            'type' => [
+                'type' => 'string',
+                'const' => 'SetNodeProperties',
+            ],
+            'success' => ['type' => 'boolean'],
+            'message' => ['type' => ['string', 'null']],
+        ],
+        'required' => ['success'],
+    ];
+
+    public const SET_NODE_REFERENCES_RESULT_SCHEMA = [
+        'type' => 'object',
+        'description' => 'The result of a single SetNodeReferences command.',
+        'properties' => [
+            'type' => [
+                'type' => 'string',
+                'const' => 'SetNodeReferences',
+            ],
+            'success' => ['type' => 'boolean'],
+            'message' => ['type' => ['string', 'null']],
+        ],
+        'required' => ['success'],
+    ];
+
+    /**
+     * The results are wrapped in an object rather than returned as a bare list: the MCP protocol
+     * requires `structuredContent` to be a JSON object, and the SDK passes whatever a tool method
+     * returns through to that field unchanged.
+     */
+    public const BULK_WRITING_RESULT_SCHEMA = [
+        'type' => 'object',
+        'description' => 'The results of a BulkWriting call, one entry per issued command, in the order the commands were given.',
+        'properties' => [
+            'results' => [
+                'type' => 'array',
+                'items' => [
+                    'oneOf' => [
+                        self::CREATE_NODEAGGREGATE_WITH_NODE_RESULT_SCHEMA,
+                        self::SET_NODE_PROPERTIES_RESULT_SCHEMA,
+                        self::SET_NODE_REFERENCES_RESULT_SCHEMA,
+                    ],
+                    'discriminator' => [
+                        'propertyName' => 'type'
+                    ],
+                ],
+            ],
+        ],
+        'required' => ['results'],
+    ];
 }
