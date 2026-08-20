@@ -32,6 +32,7 @@ class ContentRepositoryWritingCapabilities
     #[McpTool(
         name: 'CreateNodeAggregateWithNode',
         description: SchemaLibrary::CREATE_NODEAGGREGATE_WITH_NODE_SCHEMA['description'],
+        outputSchema: SchemaLibrary::CREATE_NODEAGGREGATE_WITH_NODE_RESULT_SCHEMA,
     )]
     public function createNodeAggregateWithNode(
         #[Schema(
@@ -43,7 +44,7 @@ class ContentRepositoryWritingCapabilities
         )]
         array $command,
     ): array {
-        $payload = $this->handleCreateNodeAggregateWithNode(
+        return $this->handleCreateNodeAggregateWithNode(
             nodeTypeName: $command['nodeTypeName'],
             originDimensionSpacePoint: $command['originDimensionSpacePoint'],
             parentNodeAggregateId: $command['parentNodeAggregateId'],
@@ -53,14 +54,6 @@ class ContentRepositoryWritingCapabilities
             nodeName: $command['nodeName'] ?? null,
             references: $command['references'] ?? [],
         );
-
-        return [
-            'content' => [
-                'type' => 'text',
-                'text' => \json_encode($payload),
-            ],
-            'structuredContent' => $payload,
-        ];
     }
 
     /**
@@ -70,6 +63,7 @@ class ContentRepositoryWritingCapabilities
     #[McpTool(
         name: 'SetNodeProperties',
         description: SchemaLibrary::SET_NODE_PROPERTIES_SCHEMA['description'],
+        outputSchema: SchemaLibrary::SET_NODE_PROPERTIES_RESULT_SCHEMA,
     )]
     public function setNodeProperties(
         #[Schema(
@@ -81,15 +75,7 @@ class ContentRepositoryWritingCapabilities
         )]
         array $command,
     ): array {
-        $payload = $this->handleSetNodeProperties($command['nodeAggregateId'], $command['originDimensionSpacePoint'], $command['propertyValues']);
-
-        return [
-            'content' => [
-                'type' => 'text',
-                'text' => \json_encode($payload),
-            ],
-            'structuredContent' => $payload,
-        ];
+        return $this->handleSetNodeProperties($command['nodeAggregateId'], $command['originDimensionSpacePoint'], $command['propertyValues']);
     }
 
     /**
@@ -99,6 +85,7 @@ class ContentRepositoryWritingCapabilities
     #[McpTool(
         name: 'SetNodeReferences',
         description: SchemaLibrary::SET_NODE_REFERENCES_SCHEMA['description'],
+        outputSchema: SchemaLibrary::SET_NODE_REFERENCES_RESULT_SCHEMA,
     )]
     public function setNodeReferences(
         #[Schema(
@@ -110,19 +97,11 @@ class ContentRepositoryWritingCapabilities
         )]
         array $command,
     ): array {
-        $payload = $this->handleSetNodeReferences(
+        return $this->handleSetNodeReferences(
             nodeAggregateId: $command['nodeAggregateId'],
             originDimensionSpacePoint: $command['originDimensionSpacePoint'],
             references: $command['references']
         );
-
-        return [
-            'content' => [
-                'type' => 'text',
-                'text' => \json_encode($payload),
-            ],
-            'structuredContent' => $payload,
-        ];
     }
 
     /**
@@ -136,7 +115,7 @@ class ContentRepositoryWritingCapabilities
             Each command must define its `type` (CreateNodeAggregateWithNode, SetNodeProperties, SetNodeReferences) and has the same properties as the corresponding tools.
             An example command would be {"type": "SetNodeProperties", "nodeAggregateId": "8a887309-5803-458d-b30a-40736f5a5d82", "originDimensionSpacePoint": {"language":"de"}, "propertyValues": {"title": "My Title"}}
             The commands are unserialized along with the `commands` parameter and must not be double encoded.
-            Returns a list of command results, one per issued command in correct order.
+            Returns an object with a `results` property holding one result per issued command, in the order the commands were given. Each result repeats the command\'s `type` and carries a boolean `success`.
             This tool does not work transactionally, commands that succeeded have been applied and can be considered as much for the current content graph state.
             If more than one write operation is required, always prefer this tool.
             Single-operation tools (CreateNodeAggregateWithNode, SetNodeProperties, SetNodeReferences) are only allowed if:
@@ -152,7 +131,8 @@ class ContentRepositoryWritingCapabilities
             destructiveHint: true,
             idempotentHint: false,
             openWorldHint: false,
-        )
+        ),
+        outputSchema: SchemaLibrary::BULK_WRITING_RESULT_SCHEMA,
     )]
     public function bulkWriting(
         #[Schema(
@@ -163,9 +143,10 @@ class ContentRepositoryWritingCapabilities
         )]
         array $commands,
     ): array {
-        $result = [];
+        $results = [];
         foreach ($commands as $command) {
-            $result[] = match ($command['type'] ?? null) {
+            $type = $command['type'] ?? null;
+            $commandResult = match ($type) {
                 'CreateNodeAggregateWithNode' => $this->handleCreateNodeAggregateWithNode(
                     nodeTypeName: $command['nodeTypeName'],
                     originDimensionSpacePoint: $command['originDimensionSpacePoint'],
@@ -195,9 +176,13 @@ class ContentRepositoryWritingCapabilities
                     'message' => 'Invalid command type ' . $command['type'],
                 ]
             };
+
+            // Echoing the type back keeps mixed batches interpretable: without it, a result can
+            // only be matched to its command by position.
+            $results[] = $type === null ? $commandResult : ['type' => $type] + $commandResult;
         }
 
-        return $result;
+        return ['results' => $results];
     }
 
     /**
@@ -253,19 +238,11 @@ class ContentRepositoryWritingCapabilities
                         $tetheredDescendantIds[$nodeName] = $createdNode->getNode($nodeName)->getIdentifier();
                     }
 
-                    $payload = [
+                    $result = [
                         'success' => true,
                         'nodeAggregateId' => $createdNode->getIdentifier(),
                         'nodeName' => $createdNode->getName(),
                         'tetheredDescendantAggregateIds' => $tetheredDescendantIds,
-                    ];
-
-                    $result = [
-                        'content' => [
-                            'type' => 'text',
-                            'text' => \json_encode($payload),
-                        ],
-                        'structuredContent' => $payload,
                     ];
                 } catch (\Throwable $exception) {
                     $result = [
